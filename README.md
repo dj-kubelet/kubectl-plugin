@@ -5,6 +5,10 @@ Kubectl plugin for dj-kubelet.
 ## Install
 Add the root of this repository to your `$PATH`.
 
+```
+export PATH="$PWD:$PATH"
+```
+
 ## Usage
 
 ```
