@@ -1,11 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-ACCESS_TOKEN=$(kubectl get secrets spotify-oauth -ojsonpath='{.data.accesstoken}' | base64 --decode)
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 main() {
-    case $1 in
+    case ${1:-} in
     search)
         shift
         queue_search "$@"
@@ -14,8 +13,21 @@ main() {
         shift
         queue_playlist "$@"
         ;;
+    tracks | tr)
+        shift
+        show_tracks
+        ;;
+    access-token)
+        shift
+        access_token
+        ;;
+    help)
+        shift
+        print_help
+        ;;
     *)
-        echo "unknown scriptname $1"
+        echo >&2 "Unknown scriptname ${1:-}"
+        print_help
         exit 1
         ;;
     esac
@@ -31,18 +43,22 @@ normalize_str() {
     echo "$S"
 }
 
+access_token() {
+    kubectl get secrets spotify-oauth -ojsonpath='{.data.accesstoken}' | base64 --decode
+}
+
 sp_curl() {
     #echo '[DEBUG] curl -s -H "Authorization: Bearer XXX_REDACTED_XXX"' "$@" 1>&2
-    curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$@"
+    curl -s -H "Authorization: Bearer $(access_token)" "$@"
 }
 
 queue_uri() {
     local uri=$1
     name="${uri/spotify:track:/}"
-    name="$(normalize_str "$name")"
+    name="$(normalize_str "$name-$(date +"%s")")"
     echo "$uri" "$name"
     URI="$uri" NAME="$name" envsubst <"$DIR/track.tmpl.yaml" |
-        kubectl create -f -
+        kubectl create -f - || true
 }
 
 queue_playlist() {
@@ -63,8 +79,31 @@ search() {
 }
 
 queue_search() {
+    if [ $# = "0" ]; then
+        echo "You didn't search for anything"
+        exit 1
+    fi
     id=$(search "$@" | fzf | cut -f1)
     queue_uri "$id"
+}
+
+show_tracks() {
+    kubectl get tracks -owide
+}
+
+print_help() {
+    cat >&2 <<EOF
+usage: kubectl dj-kubelet <command>
+
+These commands exist:
+    search          Search for a track and queue it.
+    playlist        Queue a playlist.
+    tracks          Show tracks in your namespace.
+    tr              Same as tracks.
+    access-token    Print your Spotify API access token, useful for epic scripts :)
+    help            Print this help text.
+
+EOF
 }
 
 main "$@"
