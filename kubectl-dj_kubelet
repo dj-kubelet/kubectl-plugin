@@ -21,6 +21,10 @@ main() {
         shift
         access_token
         ;;
+    curl)
+        shift
+        sp_curl "$@"
+        ;;
     help)
         shift
         print_help
@@ -44,7 +48,7 @@ normalize_str() {
 }
 
 access_token() {
-    kubectl get secrets spotify-oauth -ojsonpath='{.data.accesstoken}' | base64 --decode
+    kubectl get secrets spotify-oauth -ojsonpath='{.data.access_token}' | base64 --decode
 }
 
 sp_curl() {
